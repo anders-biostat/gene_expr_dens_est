@@ -2,16 +2,28 @@
 #include "mcmc.hpp"
 #include <Rcpp.h>
 
+void transform_to_simplex( const arma::vec& vals, arma::vec& simplex_point )
+// Note: simplex_point.n_elem must be vals.n_elem + 1
+{
+   const int len = vals.n_elem;
+   double cumprod = 1.;
+   for( int i = 0; i < len; i++ ) {
+      simplex_point[i] = cumprod * ( 1 - vals[i] );
+      cumprod *= vals[i];
+   }
+   simplex_point[len] = cumprod;
+}
+
 double log_target_dens( const arma::vec& vals_inp, void* ll_data )
 {
-   const int dim = vals_inp.n_elem;
+   const int len = vals_inp.n_elem;
    double ltd = 0.;
-   for( int i = 0; i < dim; i++ ) {
-      const double beta_a = dim-i;
-      const double beta_b = 1.0;
-      ltd += std::log( std::pow( vals_inp[i], beta_a-1. ) * std::pow( 1. - vals_inp[i], beta_b-1. ) /
-         ( std::tgamma( beta_a ) * std::tgamma( beta_b ) / std::tgamma( beta_a+beta_b ) ) );
+   
+   // Calculate simplex prior
+   for( int i = 0; i < len; i++ ) {
+      ltd += (len-i-1) * std::log(vals_inp[i]);
    }
+
    return ltd;
 }
 
@@ -37,9 +49,14 @@ Rcpp::NumericMatrix run_sampler( )
    
    mcmc::rwmh( initial_vals, log_target_dens, draws_out, NULL, settings );
 
-   Rcpp::NumericMatrix draws_out_r( draws_out.n_rows, draws_out.n_cols );
-   std::memcpy( draws_out_r.begin(), draws_out.memptr(), draws_out.n_elem * sizeof(double) );
-   return draws_out_r;
+   Rcpp::NumericMatrix simplex_draws_out( draws_out.n_rows, ndims );
+   for( int i = 0; i < draws_out.n_rows; i++ ) {
+      arma::vec simplex_point(ndims);
+      transform_to_simplex( draws_out.row(i).t(), simplex_point );
+      for( int j = 0; j < ndims; j++ )
+         simplex_draws_out(i,j) = simplex_point[j];
+   }
+   return simplex_draws_out;
 }
 
 
