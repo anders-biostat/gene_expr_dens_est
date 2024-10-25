@@ -14,25 +14,64 @@ void transform_to_simplex( const arma::vec& vals, arma::vec& simplex_point )
    simplex_point[len] = cumprod;
 }
 
-double log_target_dens( const arma::vec& vals_inp, void* ll_data )
+double log_target_dens_with_grad( const arma::vec& vals_inp, arma::vec* grad_out, void* data )
 {
    const int len = vals_inp.n_elem;
+   const arma::mat prob_nb = *reinterpret_cast<arma::mat*>(data);
+  
    double ltd = 0.;
    
    // Calculate simplex prior
-   for( int i = 0; i < len; i++ ) {
-      ltd += (len-i-1) * std::log(vals_inp[i]);
+   for( int j = 0; j < len-1; j++ ) {
+      ltd += (len-j-1) * std::log(vals_inp[j]);
    }
 
+   // Get simplex point   
+   arma::vec simplex_point(len+1);
+   transform_to_simplex( vals_inp, simplex_point );
+   
+   arma::vec cell_probs = prob_nb * simplex_point;
+   
+   // Calculate log likelihood
+   for( int i = 0; i < prob_nb.n_rows; i++ ) {
+      ltd += std::log(cell_probs[i]);
+   }
+
+   if( grad_out ) {
+      
+      //arma::vec simplex_grad = (1./cell_probs).t() * prob_nb;
+      arma::vec simplex_grad( len+1, arma::fill::zeros );
+      for( int r = 0; r <= len; r++ ) {
+         for( int i = 0; i < prob_nb.n_rows; i++ ) {
+           simplex_grad[r] += prob_nb(i,r) / cell_probs[i];
+         }
+      }
+
+      for( int j = 0; j < len; j++ ) {
+         double a = (len-j-1) / vals_inp[j];
+         a += simplex_grad[j] * simplex_point[j] / (vals_inp[j] - 1);
+         for( int r = j+1; r <= len; r++ ) {
+            a += simplex_grad[r] * simplex_point[r] / vals_inp[j];
+         }
+         (*grad_out)[j] = a;
+      }
+
+   }
+   
    return ltd;
 }
 
+double log_target_dens( const arma::vec& vals_inp, void* data ) {
+   return log_target_dens_with_grad( vals_inp, NULL, data );
+}
 
 // [[Rcpp::export]]
-Rcpp::NumericMatrix run_sampler( )
+Rcpp::NumericMatrix run_sampler( Rcpp::NumericMatrix prob_nb )
 {
   
-   const int ndims = 6;
+   arma::mat prob_nb_arma( prob_nb.begin(), prob_nb.nrow(), prob_nb.ncol(), false, true );
+  
+   const int ndims = prob_nb.ncol();
    arma::vec initial_vals(ndims-1);
    initial_vals.fill(0.5);
   
@@ -47,7 +86,7 @@ Rcpp::NumericMatrix run_sampler( )
 
    arma::mat draws_out;
    
-   mcmc::rwmh( initial_vals, log_target_dens, draws_out, NULL, settings );
+   mcmc::rwmh( initial_vals, log_target_dens, draws_out, &prob_nb_arma, settings );
 
    Rcpp::NumericMatrix simplex_draws_out( draws_out.n_rows, ndims );
    for( int i = 0; i < draws_out.n_rows; i++ ) {
@@ -59,4 +98,15 @@ Rcpp::NumericMatrix run_sampler( )
    return simplex_draws_out;
 }
 
+// [[Rcpp::export]]
+Rcpp::List log_target_dens_and_grad( Rcpp::NumericVector vals, Rcpp::NumericMatrix prob_nb )
+{
+   arma::mat prob_nb_arma( prob_nb.begin(), prob_nb.nrow(), prob_nb.ncol(), true, true );
+   arma::vec vals_arma( vals.begin(), vals.size() );
+   arma::vec grad_out( vals.size() );
+   double ltd = log_target_dens_with_grad( vals_arma, &grad_out, &prob_nb_arma );
+   return Rcpp::List::create( 
+     Rcpp::Named("log_density") = ltd,
+     Rcpp::Named("gradient") = Rcpp::NumericVector( grad_out.begin(), grad_out.end() ) );
+}
 
