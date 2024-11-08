@@ -66,7 +66,7 @@ double log_target_dens( const arma::vec& vals_inp, void* data ) {
 }
 
 // [[Rcpp::export]]
-Rcpp::NumericMatrix run_sampler( Rcpp::NumericMatrix prob_nb )
+Rcpp::NumericMatrix run_sampler( Rcpp::NumericMatrix prob_nb, double stepsize = .03 )
 {
   
    arma::mat prob_nb_arma( prob_nb.begin(), prob_nb.nrow(), prob_nb.ncol(), false, true );
@@ -77,8 +77,9 @@ Rcpp::NumericMatrix run_sampler( Rcpp::NumericMatrix prob_nb )
   
    mcmc::algo_settings_t settings;
   
-   settings.rwmh_settings.n_burnin_draws = 1000;
-   settings.rwmh_settings.n_keep_draws = 2000;
+   settings.rwmh_settings.n_burnin_draws = 3000;
+   settings.rwmh_settings.n_keep_draws = 20000;
+   settings.rwmh_settings.par_scale = stepsize;
    
    settings.vals_bound = true;
    settings.lower_bounds = arma::vec(ndims-1, arma::fill::zeros);
@@ -88,6 +89,9 @@ Rcpp::NumericMatrix run_sampler( Rcpp::NumericMatrix prob_nb )
    
    mcmc::rwmh( initial_vals, log_target_dens, draws_out, &prob_nb_arma, settings );
 
+   std::cout << "acceptance rate: " << static_cast<double>(settings.rwmh_settings.n_accept_draws) / 
+      settings.rwmh_settings.n_keep_draws << std::endl;   
+   
    Rcpp::NumericMatrix simplex_draws_out( draws_out.n_rows, ndims );
    for( int i = 0; i < draws_out.n_rows; i++ ) {
       arma::vec simplex_point(ndims);
@@ -97,6 +101,40 @@ Rcpp::NumericMatrix run_sampler( Rcpp::NumericMatrix prob_nb )
    }
    return simplex_draws_out;
 }
+
+// [[Rcpp::export]]
+Rcpp::NumericMatrix run_sampler2( Rcpp::NumericMatrix prob_nb, Rcpp::NumericVector initial_vals )
+{
+   
+   arma::mat prob_nb_arma( prob_nb.begin(), prob_nb.nrow(), prob_nb.ncol(), false, true );
+
+   const int ndims = prob_nb.ncol();
+   arma::vec initial_vals_arma( initial_vals.begin(), initial_vals.size() );
+
+   mcmc::algo_settings_t settings;
+
+   settings.mala_settings.n_burnin_draws = 1000;
+   settings.mala_settings.n_keep_draws = 2000;
+   
+   settings.vals_bound = true;
+   settings.lower_bounds = arma::vec(ndims-1, arma::fill::zeros);
+   settings.upper_bounds = arma::vec(ndims-1, arma::fill::ones);
+   
+   arma::mat draws_out;
+   
+   mcmc::mala( initial_vals_arma, log_target_dens_with_grad, draws_out, &prob_nb_arma, settings );
+   
+   Rcpp::NumericMatrix simplex_draws_out( draws_out.n_rows, ndims );
+   for( int i = 0; i < draws_out.n_rows; i++ ) {
+      arma::vec simplex_point(ndims);
+      transform_to_simplex( draws_out.row(i).t(), simplex_point );
+      for( int j = 0; j < ndims; j++ )
+         simplex_draws_out(i,j) = simplex_point[j];
+   }
+   return simplex_draws_out;
+}
+
+
 
 // [[Rcpp::export]]
 Rcpp::List log_target_dens_and_grad( Rcpp::NumericVector vals, Rcpp::NumericMatrix prob_nb )
