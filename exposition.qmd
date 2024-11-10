@@ -1,0 +1,166 @@
+---
+format:
+  html:
+    embed-resources: true
+---    
+
+# Density estimation for single-cell gene expression with MCMC
+
+Simon Anders, 2024-11-10
+
+## Setting
+
+In single-cell transcriptomics, we typically have a matrix $k_{ij}$ of count data, where $k_{ij}$ is the number of sequencing reads (i.e., mRNA transcript molecules) from gene $j$ that we have detected among all the sequencing reads originating from cell $i$. We put these into relation to the total count $s_i = \sum_j k_{ij}$ of reads from cell $j$:
+$\,$ $k_{ij}/s_i$ estimates which fraction of the mRNA molecules in cell $i$ originate from gene $j$.
+
+We assume that each cell $j$ has some abstract "state" that implies a vector $(\lambda_{i1},...,\lambda_{im})$ (with $\sum_j\lambda_{ij}=1$), where $\lambda_{im}$ is the expected amount of transcripts from gene $j$ as a fraction of all the transcript molecules in cell $i$. Furthermore, we assume the actual count of mRNA molecules in the cell to be multinomially-distributed according to this this proportions vector. When sequencing, we detect each molecule only with a certain probability, but if we assume this probability to be the same for all genes, we may conclude that the distribution of the vector $(k_{i1},\dots,k_{im})$ is drawn from a multinomial distribution with total $s_i$ and proportions vector $(\lambda_{i1},...,\lambda_{im})$, if we condition on $s_i$.
+
+If we consider only a single gene $j$, it is helpful to consider $s_i$ as a known constant (i.e., as a variable we always implicitly condition on) and to ignore the counts for the other genes, so that we do not have to ensure that the counts sum to $s_i$. Then, we may simply write
+$$ k_i | \lambda_i\sim \text{Pois}(s_i \lambda_i), $$ {#eq-p}
+where we have dropped the index $j$ as we, from now on, will focus on only one gene.
+
+## Task
+
+Given observed counts $k_i$ for some gene and observed totals $s_i$, for $n$ cells indexed as $i=1,\dots,n$, estimate the distribution of the $\lambda_i$ in @eq-p.
+
+## Example data
+
+Let us consider $n=1000$ cells.
+
+```{r}
+n <- 1000
+```
+
+To get example values for the totals $s_i$ that somewhat mimic real data, we draw from a log normal with mean around 2500.
+
+```{r}
+set.seed( 13245768 )
+
+s <- round( 10^rnorm( n, log10(2500), .5 ) )
+
+hist( log10(s), 30 )
+```
+
+We assume that the cells come from two distinct populations and that the expression of our gene is much higher in one population than in the other. We draw the true values $\lambda_i$ for our example from a mixture of two log-normals.
+
+```{r}
+truelambda <- 10^ifelse( runif(n)<.7, rnorm( n, -3.3, .4 ), rnorm( n, -1.7, .2 ) )
+
+hist( log10(truelambda), 30 )
+```
+
+Now we can draw the counts according to @eq-p.
+
+```{r}
+k <- rpois( n, truelambda*s )
+```
+
+Here is a plot of the estimated fractions $k_i/s_i$, with a logarithmic x axis and a log1p-scaled y axis:
+
+```{r}
+plot( s, log( k/s + 1e-4 ), cex=.3, log="x", yaxt="n", ylab="k/s" )
+
+tics <- c( 0, .0001, .0003, .001, .003, .01, .03, .1 )
+axis( 2, log( tics + 1e-4 ), tics, las=2 )
+```
+
+To be able to get a histogram of the estimated fractions, it is customary in the field to
+transform them according to $y_i = \log_{10}\left(k_i/s_i\cdot 10^4 + 1\right)$ (as we have also
+done above for the y axis). 
+
+```{r}
+hist( log10( k/s*1e4 + 1 ) )
+```
+
+This histogram shows three modes, giving the misleading impression that the cells are drawn
+from three population, while our actual mixture distribution used above had only two components.
+Avoiding such issues is the purpose of this work.
+
+## A basis for the distributions
+
+In order to be able to describe possible distributions for the $\lambda_i$, we use an $r$-dimensional basis
+of Gamma distributions with means $\mu_1,\dots,\mu_r$ which increase geometrically as $\mu_{l+1}=\nu\mu_l$. Let's use $\mu_1=10^{-5}$ and $\nu=2$ and have steps up to $\mu_r\approx 1$:
+
+```{r}
+stepsize <- log(2)  # log(nu)
+mu <- exp( seq( log(1e-5), 0, by=stepsize ) )
+```
+
+A gamma distribution has two parameters, known as shape and scale. We set the shape parameter, $\kappa$, to a constant value that is related to $\log(\nu)$, e.g., to $\kappa=2/\log(\nu)$. The scale parameter, $\theta$, then has to be set to $\theta_i = \mu_i / \kappa$ to get the desired means, because in a Gamma, $\mu=\kappa\theta$. 
+
+Here is a plot of these densities
+
+```{r}
+shape <- 2 / stepsize  # kappa
+scale <- mu / shape    # theta
+
+plot( NULL, xlim=c(-6,1), ylim=c(0,3), xlab="log10(lambda)", ylab="density" )
+xg <- seq( -20, 1, length.out=1000 )
+
+for( i in 1:length(mu) )
+  lines( xg, dgamma( 10^xg, shape=shape, scale=scale[i] )*(10^xg)*log(10) )
+```
+Note that we had to multiply the densities by their argument in order to account for the logarithmic transformation of the x axis.
+
+Also note that the ratio of the spacing the gammas to their width (both taken on the log scale) is proportional to $\kappa \log\nu$, which we have set to 2 above.
+
+We wish to describe the bimodal distribution that we drew the $\lambda_i$ from as a mixture of these 
+basis distributions, whose pdf we write as
+$$ f_{\boldsymbol{\pi}}(\lambda) = \sum_{l=1}^r \pi_l f_{\text{Ga}}(\lambda|\kappa_l,\theta_l), \quad \text{with }\sum_{l=1}^r\pi_l=1,$$  {#eq-pi}
+where $f_\text{Ga}(\cdot|\kappa,\theta)$ is the pdf of a Gamma distribution with shape $\kappa$ and scale $\theta$.
+
+Our aim is to find a vector of mixture component weights $\pi_l$ that make the observed $k_i$ likely.
+
+For this, we use the following fact: If $K|\lambda\sim\text{Pois}(\lambda)$ and $\lambda\sim\text{Ga}(\kappa,\theta)$, then $K\sim \text{NB}(\mu,\theta)$, where $\text{NB}(\mu,\theta)$ is the negative binomial distribution with the same expectation as the Gamma, i.e., $\mu=\kappa\theta$, and with size parameter $\theta$.
+
+
+The likelihood of the weights $\pi_l$ given the observed counts $k_i$ is
+
+$$ \begin{align}
+L(\boldsymbol\pi) &= \prod_{i=1}^n\,\int_0^\infty\!f_\text{Pois}(k_i|s_i\lambda)f_\boldsymbol{\pi}(\lambda)\,\text{d}\lambda \\
+& = \prod_{i=1}^n \sum_{l=1}^r \pi_l\int_0^\infty f_\text{Pois}(k_i|s_i\lambda)f_\text{Ga}(\lambda|\kappa_l,\theta_l)\,\text{d}\lambda \\
+& = \prod_{i=1}^n\sum_{l=1}^r \pi_l\,f_\text{NB}(k_i|s_i\kappa_l\theta_l,\theta_l) \\
+& = \prod_{i=1}^n\sum_{l=1}^r \pi_lL^\text{NB}_{il} = \prod_{i=1}^n L^\text{NB}\boldsymbol\pi.
+\end{align} $$
+
+The negative binomial probabilities do not depend on $\boldsymbol\pi$ and hence will be constant while maximizing the likelihood or while running MCMC. This is why we collect them in a matrix $L^\text{NB}$ that we compute beforehand:
+
+```{r}
+lnb <- sapply( 1:length(mu), function(l)
+   dnbinom( k, mu = s*mu[l], size = shape ) )
+```
+
+For $\boldsymbol\pi$, let us assume a prior that is flat w.r.t. the metric that $\mathbb{R}^r$ sets for the simplex from which $\boldsymbol\pi$ may be drawn, i.e., $f_\text{prior}(\boldsymbol\pi)\propto\delta\left(1-\sum_l\pi_l\right)$. Then, we have for the (unnormalized) posterior
+
+$$P(\boldsymbol\pi) \propto \int_{\mathbb{R}^r}L^\text{NB}\boldsymbol\pi\,\delta(\|\boldsymbol\pi\|_1-1)\,\text{d}^r\pi
+$$
+We can draw MCMC samples from this posterior using the simplex sampler functionality described in [mcmc_mixt_dens.qmd], which is written for distributions of precisely this shape.
+
+```{r}
+Rcpp::sourceCpp( "simplex_sampler.cc" ); 
+
+draws <- sample_mixture_weights( lnb )
+
+str(draws)
+```
+
+Here are the means of the weights:
+```{r}
+colMeans(draws)
+```
+
+We use these means to form $\boldsymbol\pi$ and plot the distribution $f_\boldsymbol{\pi}$, calculated with @eq-pi. As 
+before, we use a logarithmic x axis, labeled with log10 values, and transform the density accordingly.
+
+We superimpose this over a histogram of the $\lambda_i$ that we had drawn initially and from which we have obtained our $k_i$.
+
+```{r}
+hist( log10(truelambda), 30, freq=FALSE )
+
+lines( xg, 
+   sapply( 10^xg, function(xx)
+        sum( dgamma( xx, shape=shape, scale=scale ) * colMeans(draws) ) ) *
+     (10^xg) * log(10), col="red" )
+
+```
+
