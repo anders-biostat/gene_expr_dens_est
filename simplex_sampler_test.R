@@ -1,17 +1,10 @@
-#### Try the MCMC samples
+#### Testbed for the MCMC sampler
 
 ## Compile the C++ code
 
 library(Rcpp)
 
-mcmc_basedir <- "/home/anders/w/gene_expr_dens_est/mcmc"
-
-Sys.setenv( 
-  PKG_CXXFLAGS = sprintf( "-I%s/include %s -O3 -mtune=native", mcmc_basedir, Sys.getenv("PKG_CXXFLAGS") ),
-  PKG_LIBS = sprintf( "-larmadillo %s", Sys.getenv("PKG_LIBS") ) )
-  #PKG_LIBS = sprintf( "-L%s -lmcmc -Wl,-rpath,%s %s", mcmc_basedir, mcmc_basedir, Sys.getenv("PKG_LIBS") ) )
-
-Rcpp::sourceCpp("simplex_sampler_with_manual_simplex.cc", verbose=TRUE, rebuild=TRUE ); 
+Rcpp::sourceCpp("simplex_sampler.cc", verbose=TRUE, rebuild=TRUE ); 
 
 
 ## Construct example data
@@ -32,19 +25,24 @@ scale <- mu / shape    # theta
 pmf_nb <- sapply( mu, function(mu_) dnbinom( k, mu=s*mu_, size=shape ) )
 
 # Run sampler
-draws <- run_manual_sampler(pmf_nb)
-#draws <- run_sampler2(pmf_nb, colMeans(draws)[-1] );
+draws <- sample_mixture_weights(pmf_nb)
 
 # Get means
 spi <- colMeans(draws)
-spi <- runif( ncol(draws) )
 
+logits <- log( spi / (1-spi) )
+spi <- 1 / ( 1 + exp(-logits) )
+spi <- spi/sum(spi)
 
-spi <- exp( optim( log(colMeans(draws)), function(x) { x <- exp(x); x <- x/sum(x); -sum( log( pmf_nb %*% x ) ) } )$par )
-
-
-spi <- exp( optim( rnorm(length(mu)), function(x) { x <- exp(x); x <- x/sum(x); -sum( log( pmf_nb %*% x ) ) } )$par )
-
+#logits <- rnorm( length(logits) )
+optim( 
+   logits, 
+   function(x) {
+      x <- 1 / ( 1 + exp(-x) )
+      x <- x / sum(x)
+      -sum( log( pmf_nb %*% ( x ) ) ) }
+)$par -> logits
+spi <- 1 / ( 1 + exp(-logits) )
 spi <- spi/sum(spi)
 
 # Plot result
@@ -54,6 +52,17 @@ lines( xg,
        sapply( 1:length(mu), function(i)
          dgamma( 10^xg, shape=mu[i]/scale[i], scale=scale[i] )*(10^xg)*log(10) ) %*% spi,
        col="red" )
+
+
+###########
+
+
+
+
+
+
+
+
 
 
 a <- t( sapply( 1:length(mu), function(i)
@@ -114,3 +123,18 @@ t(sapply( 1:nrow(draws), function(d) {
       x[ a[i] : a[i+1] ] <- i
    x } )) -> a
 image(a)
+
+
+
+
+##
+
+spi <- runif( ncol(draws) )
+
+
+spi <- exp( optim( log(colMeans(draws)), function(x) { x <- exp(x); x <- x/sum(x); -sum( log( pmf_nb %*% x ) ) } )$par )
+
+
+spi <- exp( optim( rnorm(length(mu)), function(x) { x <- exp(x); x <- x/sum(x); -sum( log( pmf_nb %*% x ) ) } )$par )
+
+spi <- spi/sum(spi)
