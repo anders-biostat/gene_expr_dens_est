@@ -1,0 +1,34 @@
+---
+title: "Estimation of weights in mixture distributions with MCMC"
+format: html
+---
+
+## Setting
+
+Let $f_l$ (with $l=1,\dots,r$) be a list of distribution function and
+
+$$ f_\boldsymbol{\pi}(x) = \sum_{l=1}^r \pi_l f_l(x)$$
+the mixture distribution arising by combining them, using the weight vector $\boldsymbol\pi=(\pi_1,\dots,\pi_r)$, which is normalized, i.e., $\boldsymbol\pi\in S_r$. Here, $S_r$ is the $(r-1)$-dimensional standard simplex, $S_r=\left\{ \boldsymbol{\pi}\in\mathbb{R}_+^r\mid\sum_{l=1}^r\pi_l=1\right\}$. 
+
+The $f_l$ are known but the $\pi_l$ are unknown. We wish to estimate them from a given list of random variates $x_i$ ($i=1,\dots,n$) drawn i.i.d. from $f_\boldsymbol\pi$.
+
+Assuming a flat prior on $\boldsymbol\pi$ (``flat'' meaning uniform in $S_r$), we can write for the posterior
+
+$$ P(\boldsymbol\pi) = \int_{\mathbb{R}^r} \delta\left(1-\sum_{l=1}^r\pi_l\right)\,f_\text{pr}(\boldsymbol\pi)\prod_{i=1}^n \sum_{l=1}^r\pi_l f_l(x_i)\,\text{d}^r\pi,
+$$
+where the Dirac delta $\delta$ constrains the integral to the simplex.
+
+To keep things simple, we use a flat prior, $f_\text{pr}(\boldsymbol\pi)\propto 1$. With this, the integrand only contains the likelihood.
+
+The log likelihood is
+$$ L(\boldsymbol\pi)=\log \prod_{i=1}^n \sum_{l=1}^r\pi_l f_l(x_i) = \sum_{i=1}^n \log \sum_{l=1}^rL_{il}\pi_l,
+$$
+where $L_{il} = f_l(x_i)$ is a matrix of values that we can precompute, containing the likelihood of each mixture component for each observation.
+
+## MCMC
+
+In order to get estimates for $\boldsymbol\pi$, we draw samples from posterior using MCMC. Then, using the element-wise means of these is often sufficient.
+
+The likelihood just given is so simple that it pays to code a tailored MCMC sample for it rather than using a general purpose tool like Stan.
+
+The function `sample_mixture_weights` takes the matrix $L$ as well as MCMC control parameters and returns a matrix $P$ of MCMC samples drawn from $P(\boldsymbol\pi)$. 
