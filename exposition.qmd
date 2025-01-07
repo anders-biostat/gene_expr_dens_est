@@ -91,7 +91,7 @@ A gamma distribution has two parameters, known as shape and scale. We set the sh
 Here is a plot of these densities
 
 ```{r}
-shape <- 2 / stepsize  # kappa
+shape <- 5 / stepsize  # kappa
 scale <- mu / shape    # theta
 
 plot( NULL, xlim=c(-6,1), ylim=c(0,3), xlab="log10(lambda)", ylab="density" )
@@ -132,8 +132,7 @@ lnb <- sapply( 1:length(mu), function(l)
 
 For $\boldsymbol\pi$, let us assume a prior that is flat w.r.t. the metric that $\mathbb{R}^r$ sets for the simplex from which $\boldsymbol\pi$ may be drawn, i.e., $f_\text{prior}(\boldsymbol\pi)\propto\delta\left(1-\sum_l\pi_l\right)$. Then, we have for the (unnormalized) posterior
 
-$$P(\boldsymbol\pi) \propto \int_{\mathbb{R}^r}L^\text{NB}\boldsymbol\pi\,\delta(\|\boldsymbol\pi\|_1-1)\,\text{d}^r\pi
-$$
+$$P(\boldsymbol\pi) \propto \int_{\mathbb{R}^r}L^\text{NB}\boldsymbol\pi\,\delta(\|\boldsymbol\pi\|_1-1)\,\text{d}^r\pi$$
 We can draw MCMC samples from this posterior using the simplex sampler functionality described in [mcmc_mixt_dens.qmd], which is written for distributions of precisely this shape.
 
 ```{r}
