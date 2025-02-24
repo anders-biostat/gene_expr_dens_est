@@ -3,6 +3,7 @@
 #include <thread>
 #include <random>
 #include <vector>
+#include <cassert>
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
@@ -16,7 +17,7 @@ void transform_to_simplex(const arma::vec& vals, arma::vec& simplex_point) {
    simplex_point[len] = cumprod;
 }
 
-double log_target_dens(const arma::vec& vals_inp, const Rcpp::NumericMatrix& comp_lh) {
+double log_target_dens(const arma::vec& vals_inp, const Rcpp::NumericMatrix& lhm) {
    const int len = vals_inp.n_elem;
    double ltd = 0.0;
    
@@ -38,20 +39,29 @@ double log_target_dens(const arma::vec& vals_inp, const Rcpp::NumericMatrix& com
    transform_to_simplex(vals, simplex_point);
    
    // Log-likelihood
-   for (int i = 0; i < comp_lh.nrow(); i++) {
+   for (int i = 0; i < lhm.nrow(); i++) {
       double lh = 0.0;
       for (int j = 0; j < len + 1; j++)
-         lh += comp_lh(i,j) * simplex_point[j];
+         lh += lhm(i,j) * simplex_point[j];
       ltd += std::log(lh);
    }
    
    return ltd;
 }
 
-Rcpp::NumericMatrix run_one_chain(const Rcpp::NumericMatrix& comp_lh, double stepsize,
-                                  int n_burnin_draws, int n_keep_draws, unsigned int seed) {
-   const int ndims = comp_lh.ncol();
-   Rcpp::NumericMatrix draws(n_keep_draws, ndims);
+Rcpp::NumericMatrix run_one_chain(Rcpp::NumericMatrix draws, const Rcpp::NumericMatrix& lhm, 
+         const double initial_stepsize, const int n_burnin_draws, const double temperature_decrease, const unsigned int seed) {
+   
+   const double target_accept_rate = 0.234;
+   const int adapt_interval = 100;
+
+   const int ndims = lhm.ncol();
+   const int n_keep_draws = draws.nrow();
+   assert( draws.ncol() == ndims );
+   
+   double stepsize = initial_stepsize;
+   int accepted_since_last_adapt = 0;
+   double temperature = 1.;
    
    // RNG per chain
    std::mt19937 gen(seed);
@@ -59,12 +69,7 @@ Rcpp::NumericMatrix run_one_chain(const Rcpp::NumericMatrix& comp_lh, double ste
    std::normal_distribution<double> normal_dis(0.0, 1.0);
    
    arma::vec current_draw(ndims - 1, arma::fill::value(0.1));
-   double current_log_prob = log_target_dens(current_draw, comp_lh);
-   
-   int n_accepts = 0;
-   double target_accept_rate = 0.234;
-   int adapt_interval = 100;
-   int accepted_since_last_adapt = 0;
+   double current_log_prob = log_target_dens(current_draw, lhm);
    
    for (int i = 0; i < n_burnin_draws + n_keep_draws; i++) {
       // Generate proposal
@@ -74,49 +79,47 @@ Rcpp::NumericMatrix run_one_chain(const Rcpp::NumericMatrix& comp_lh, double ste
          proposal[k] = current_draw[k] + z * stepsize;
       }
       
-      double proposal_log_prob = log_target_dens(proposal, comp_lh);
+      double proposal_log_prob = log_target_dens(proposal, lhm);
       
       double randval = uniform_dis(gen);
-      bool accepted = (randval < std::exp(proposal_log_prob - current_log_prob));
+      bool accepted = (randval < std::exp( (proposal_log_prob - current_log_prob) / temperature ) );
       
       if (accepted) {
          current_draw = proposal;
          current_log_prob = proposal_log_prob;
-         if (i >= n_burnin_draws)
-            n_accepts++;
+         accepted_since_last_adapt++;
+      }         
+
+      if ((i+1) % adapt_interval == 0) {
+         double current_accept_rate = (double)accepted_since_last_adapt / adapt_interval;
+         stepsize *= std::exp((current_accept_rate - target_accept_rate));
+         accepted_since_last_adapt = 0;
       }
-      
-      // Adapt stepsize during burn-in
-      if (i < n_burnin_draws) {
-         if (accepted) accepted_since_last_adapt++;
-         if ((i + 1) % adapt_interval == 0) {
-            double current_accept_rate = (double)accepted_since_last_adapt / adapt_interval;
-            stepsize *= std::exp((current_accept_rate - target_accept_rate));
-            accepted_since_last_adapt = 0;
-         }
-      }
-      
+
       if (i >= n_burnin_draws) {
          arma::vec simplex_point(ndims);
          transform_to_simplex(1.0 / (1.0 + arma::exp(-current_draw)), simplex_point);
          for (int j = 0; j < ndims; j++) {
             draws(i - n_burnin_draws, j) = simplex_point[j];
          }
+         
+         temperature *= temperature_decrease;
       }
       
    }
    
-   draws.attr("n_accepted_steps") = n_accepts;
+   draws.attr("n_accepted_steps") = accepted_since_last_adapt;
    draws.attr("final_stepsize") = stepsize;
    return draws;
 }
 
 // [[Rcpp::export]]
-Rcpp::List sample_mixture_weights_threads(Rcpp::NumericMatrix comp_lh, 
-                                          double stepsize = 0.03,
-                                          int n_burnin_draws = 3000, 
-                                          int n_keep_draws = 20000,
-                                          unsigned int global_seed = 12345) {
+Rcpp::List sample_mixture_weights_threads(const Rcpp::NumericMatrix lhm, 
+                                          const double initial_stepsize = 0.03,
+                                          const int n_burnin_draws = 3000, 
+                                          const int n_keep_draws = 20000,
+                                          const double temperature_decrease = 0.999, 
+                                          const unsigned int global_seed = 12345) {
    const int n_chains = 4;
    std::vector<Rcpp::NumericMatrix> chain_results(n_chains);
    
@@ -127,6 +130,7 @@ Rcpp::List sample_mixture_weights_threads(Rcpp::NumericMatrix comp_lh,
    std::vector<unsigned int> chain_seeds(n_chains);
    for (int c = 0; c < n_chains; c++) {
       chain_seeds[c] = global_gen();
+      chain_results[c] = Rcpp::NumericMatrix( n_keep_draws, lhm.ncol() );
    }
    
    std::vector<std::thread> threads;
@@ -134,8 +138,8 @@ Rcpp::List sample_mixture_weights_threads(Rcpp::NumericMatrix comp_lh,
    
    for (int c = 0; c < n_chains; c++) {
       threads.emplace_back([&, c]() {
-         Rcpp::NumericMatrix res = run_one_chain(comp_lh, stepsize, n_burnin_draws, n_keep_draws, chain_seeds[c]);
-         chain_results[c] = res;
+         run_one_chain( chain_results[c], lhm, initial_stepsize, n_burnin_draws, 
+               temperature_decrease, chain_seeds[c] );
       });
    }
    
