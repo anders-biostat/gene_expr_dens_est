@@ -4,7 +4,7 @@
 
 library(Rcpp)
 
-Rcpp::sourceCpp("simplex_sampler.cc", verbose=TRUE, rebuild=TRUE ); 
+Rcpp::sourceCpp("simplex_sampler_threaded.cc", verbose=TRUE, rebuild=TRUE ); 
 
 
 ## Construct example data
@@ -15,7 +15,7 @@ truelambda <- 10^ifelse( runif(n)<.7, rnorm( n, -3.3, .4 ), rnorm( n, -1.7, .2 )
 k <- rpois( n, truelambda*s )
 
 ## Construct density basis
-stepsize <- log(1.25)  # log(nu)
+stepsize <- log(1.125)  # log(nu)
 mu <- exp( seq( log(3e-5), 0, by=stepsize ) )
 #mu <- sample(mu)
 shape <- 2 / stepsize  # kappa
@@ -25,32 +25,26 @@ scale <- mu / shape    # theta
 pmf_nb <- sapply( mu, function(mu_) dnbinom( k, mu=s*mu_, size=shape ) )
 
 # Run sampler
-draws <- sample_mixture_weights(pmf_nb)
+draws <- sample_mixture_weights_threads( pmf_nb, n_burnin_draws=0L, n_keep_draws=10000L, 
+               temperature_decrease=.95, global_seed = as.integer( runif(1,0,100000) ),  )
+
+plot(draws[[1]][,11], type="l", ylim=c(0,.02))
+lines(draws[[2]][,11], col=2)
+lines(draws[[3]][,11], col=3)
+lines(draws[[4]][,11], col=4)
 
 # Get means
-spi <- colMeans(draws)
-
-logits <- log( spi / (1-spi) )
-spi <- 1 / ( 1 + exp(-logits) )
-spi <- spi/sum(spi)
-
-#logits <- rnorm( length(logits) )
-optim( 
-   logits, 
-   function(x) {
-      x <- 1 / ( 1 + exp(-x) )
-      x <- x / sum(x)
-      -sum( log( pmf_nb %*% ( x ) ) ) }
-)$par -> logits
-spi <- 1 / ( 1 + exp(-logits) )
-spi <- spi/sum(spi)
+#spi <- sapply( draws, colMeans )
+spi <- sapply( draws, function(x) x[ nrow(x), ] )
+max( dist(t(spi)) )
 
 # Plot result
 hist( log10(truelambda), freq=FALSE, xlab="log10(lambda)", 30, main="", xlim=c(-6,1) )
 xg <- seq( -6, 0, length.out=1000 )      
-lines( xg,
+for( i in 1:ncol(spi) )
+   lines( xg,
        sapply( 1:length(mu), function(i)
-         dgamma( 10^xg, shape=mu[i]/scale[i], scale=scale[i] )*(10^xg)*log(10) ) %*% spi,
+         dgamma( 10^xg, shape=mu[i]/scale[i], scale=scale[i] )*(10^xg)*log(10) ) %*% spi[,i],
        col="red" )
 
 
