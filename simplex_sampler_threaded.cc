@@ -49,7 +49,7 @@ double log_target_dens(const arma::vec& vals_inp, const Rcpp::NumericMatrix& lhm
    return ltd;
 }
 
-Rcpp::NumericMatrix run_one_chain(Rcpp::NumericMatrix draws, const Rcpp::NumericMatrix& lhm, 
+void run_one_chain(Rcpp::NumericMatrix& draws, const Rcpp::NumericMatrix& lhm, 
          const double initial_stepsize, const int n_burnin_draws, const double temperature_decrease, const unsigned int seed) {
    
    const double target_accept_rate = 0.234;
@@ -108,9 +108,8 @@ Rcpp::NumericMatrix run_one_chain(Rcpp::NumericMatrix draws, const Rcpp::Numeric
       
    }
    
-   draws.attr("n_accepted_steps") = accepted_since_last_adapt;
-   draws.attr("final_stepsize") = stepsize;
-   return draws;
+   //draws.attr("n_accepted_steps") = accepted_since_last_adapt;
+   //draws.attr("final_stepsize") = stepsize;
 }
 
 // [[Rcpp::export]]
@@ -121,7 +120,7 @@ Rcpp::List sample_mixture_weights_threads(const Rcpp::NumericMatrix lhm,
                                           const double temperature_decrease = 0.999, 
                                           const unsigned int global_seed = 12345) {
    const int n_chains = 4;
-   std::vector<Rcpp::NumericMatrix> chain_results(n_chains);
+   std::vector<Rcpp::NumericMatrix> chain_results;
    
    // Create a single global RNG
    std::mt19937 global_gen(global_seed);
@@ -130,7 +129,7 @@ Rcpp::List sample_mixture_weights_threads(const Rcpp::NumericMatrix lhm,
    std::vector<unsigned int> chain_seeds(n_chains);
    for (int c = 0; c < n_chains; c++) {
       chain_seeds[c] = global_gen();
-      chain_results[c] = Rcpp::NumericMatrix( n_keep_draws, lhm.ncol() );
+      chain_results.emplace_back( Rcpp::NumericMatrix( n_keep_draws, lhm.ncol() ) );
    }
    
    std::vector<std::thread> threads;
