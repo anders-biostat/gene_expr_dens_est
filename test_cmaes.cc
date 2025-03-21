@@ -66,10 +66,10 @@ Rcpp::NumericVector do_sann( const Rcpp::NumericMatrix& lhm ) {
    double sigma = 0.1;
    //int lambda = 100; // offsprings at each generation.
    CMAParameters<> cmaparams(x0,sigma);
-   cmaparams.set_max_iter(100000);
-   cmaparams.set_ftolerance(1e-1);
-   //cmaparams._algo = BIPOP_CMAES;
-   libcmaes::FitFunc objective =
+   cmaparams.set_max_iter(30000);
+   cmaparams.set_ftolerance(lhm.size()*1e-5);
+   cmaparams.set_sep();
+   FitFunc objective =
       [&lhm](const double *x, const int &N) { return -log_target_dens( x, lhm ); }; 
    CMASolutions cmasols = cmaes<>(objective, cmaparams);
    cout << "best solution: " << cmasols << endl;

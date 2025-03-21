@@ -1,16 +1,3 @@
-library(Rcpp)
-
-eigen_flags <- system("pkg-config --cflags eigen3", intern = TRUE)
-custom_inc  <- normalizePath("libcmaes/include")
-Sys.setenv(PKG_CXXFLAGS = paste(eigen_flags, "-I", custom_inc, "-lcmaes"))
-lib_path <- normalizePath("libcmaes/lib")
-Sys.setenv(PKG_LIBS = paste("-L", lib_path, "-lcmaes", "-Wl,-rpath", lib_path))
-
-sourceCpp("test_cmaes.cc", verbose=TRUE, rebuild=TRUE)
-test() 
-
-
-
 ## Construct test data
 n <- 1500
 s <- round( 10^rnorm( n, log10(2500), .5 ) )
@@ -18,6 +5,17 @@ truelambda <- 10^ifelse( runif(n)<.7, rnorm( n, -3.3, .4 ), rnorm( n, -1.7, .2 )
 k <- rpois( n, truelambda*s )
 
 hist( log10(truelambda), freq=FALSE, xlab="log10(lambda)", 30, main="", xlim=c(-6,1) )
+
+## Compile C++ cpde
+eigen_flags <- system("pkg-config --cflags eigen3", intern = TRUE)
+custom_inc  <- normalizePath("libcmaes/include")
+Sys.setenv(PKG_CXXFLAGS = paste(eigen_flags, "-I", custom_inc, "-lcmaes"))
+lib_path <- normalizePath("libcmaes/lib")
+Sys.setenv(PKG_LIBS = paste("-L", lib_path, "-lcmaes", "-Wl,-rpath", lib_path))
+
+Rcpp::sourceCpp("test_cmaes.cc", verbose=TRUE, rebuild=TRUE)
+test() 
+
 
 ## Estimator hyperparameters
 min_mu <- 3e-5
