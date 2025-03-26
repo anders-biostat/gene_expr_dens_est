@@ -1,8 +1,9 @@
-Consider a gene with Gamma distributed expression fraction with mean $q$ and variance $v$ (non log scale), and counts $K_i$ for this gene for cell $i$, with total count $s_i$:
+Consider a gene whose expression fraction follows some distribution with mean $q$ and variance $v$ (non log scale), and counts $K_i$ for this gene for cell $i$, with total count $s_i$:
 
 $$\begin{align}
  K_i|Q_i &\sim \text{Pois}(s_i Q_i) \\
- Q_i &\sim \text{Ga}(q,v) 
+ \operatorname{E}(Q_i) &= q \\
+ \operatorname{Var}(Q_i) &= v
 \end{align}$$ The total expectation and variance of $K_i$ is
 $$\begin{align}
 \text{E}(K_i) &= \text{E}(\text{E}(K_i|Q_i))=E(s_i Q_i)=s_iq \\
