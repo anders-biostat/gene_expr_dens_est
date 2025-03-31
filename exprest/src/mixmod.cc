@@ -1,7 +1,7 @@
 #include <Rcpp.h>
-#include "c-cmaes/src/cmaes_interface.h"
+#include "c-cmaes/cmaes_interface.h"
 
-#include "c-cmaes/src/cmaes.c"
+#include "c-cmaes/cmaes.c"
 
 void transform_to_simplex( const double *const vals, double *const simplex_point, int n ) {
    double cumprod = 1.0;

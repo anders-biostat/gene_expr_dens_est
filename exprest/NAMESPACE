@@ -1,0 +1,3 @@
+useDynLib(exprest, .registration=TRUE)
+importFrom(Rcpp, evalCpp)
+export(test)

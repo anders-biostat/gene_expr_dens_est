@@ -1,0 +1,19 @@
+Package: exprest
+Version: 0.1-0
+Date: 2025-03-31
+Title: Density estimation for gene expression counts
+Authors@R: c(person("Simon", "Anders", role = c("aut", "cre"),
+                     email = "simon.anders@bioquant.uni-heidelberg.de",
+                     comment = c(ORCID = "0000-0003-4868-1805")))
+Author: Simon Anders [aut, cre]
+Maintainer: Simon Anders <sanders@fs.tum.de>
+Imports: Rcpp (>= 1.0.0)
+LinkingTo: Rcpp
+Description: Given UMI counts from single-cell RNA sequencing data
+  or similar count data, allows to estimate the distribution of the
+  underlying rates, i.e., deconvolute the Poisson noise out of the
+  expression data
+NeedsCompilation: yes
+License: GPL (>= 3)
+URL: none-yet
+BugReports: none-yet
