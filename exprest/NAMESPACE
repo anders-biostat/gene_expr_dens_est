@@ -1,3 +1,6 @@
 useDynLib(exprest, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
 export(test)
+export(mixmod)
+export(est_dens)
+export(make_test_data)

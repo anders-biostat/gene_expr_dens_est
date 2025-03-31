@@ -64,13 +64,13 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
    std::fill_n( sigma0, n, 1. );
    funvals = cmaes_init( &evo, n, x0, sigma0, 0, 0, NULL );
    evo.sp.stopTolFun = 1e-2;
+   evo.sp.flgsupplemented = true;
    
    while( !cmaes_TestForTermination(&evo) ) {
       pop = cmaes_SamplePopulation(&evo);
       
       for( int i = 0; i < evo.sp.lambda; ++i ) {
          funvals[i] = -log_target_dens( pop[i], lhm );
-         Rcpp::Rcout << funvals[i] << std::endl;
       }
       cmaes_UpdateDistribution( &evo, funvals );  
       iter++;

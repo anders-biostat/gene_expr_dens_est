@@ -17,3 +17,4 @@ NeedsCompilation: yes
 License: GPL (>= 3)
 URL: none-yet
 BugReports: none-yet
+RoxygenNote: 7.3.1

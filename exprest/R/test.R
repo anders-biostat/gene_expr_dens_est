@@ -1,13 +1,12 @@
-test <- function() {
-	n <- 1500
+make_test_data <- function( n=1500 ) {
 	s <- round( 10^rnorm( n, log10(2500), .5 ) )
-	truelambda <- 10^ifelse( runif(n)<.7, rnorm( n, -3.3, .4 ), rnorm( n, -1.7, .2 ) )
-	k <- rpois( n, truelambda*s )
-	stepsize <- log(1.2)  # log(nu)
-	mu <- exp( seq( log(3e-5), 0, by=stepsize ) )
-	shape <- 10 / stepsize  # kappa
-	scale <- mu / shape    # theta
-	pmf_nb <- sapply( mu, function(mu_) dnbinom( k, mu=s*mu_, size=shape ) )
+	true_lambda <- 10^ifelse( runif(n)<.7, rnorm( n, -3.3, .4 ), rnorm( n, -1.7, .2 ) )
+	k <- rpois( n, true_lambda*s )
+	data.frame( k, s, true_lambda )
+}
 
-	mixmod(pmf_nb)	
+test <- function() {
+	data <- make_test_data()
+	dens <- est_dens( data$k, data$s )
+	plot( density ~ log10lambda, dens, type="l" )
 }
