@@ -1,0 +1,42 @@
+---
+title: "Exprest"
+format: html
+---
+
+## Installation
+
+```r
+devtools::install_github( "anders-biostat/gene_expr_dens_est", subdir="exprest" )
+```
+
+## Test
+
+Load library
+
+```{r}
+library(exprest)
+```
+
+Make example data
+
+```{r}
+ex_data <- exprest::make_test_data()
+
+head( ex_data )
+```
+
+Run estimator
+
+```{r}
+dens <- exprest::est_dens( ex_data$k, ex_data$s )  # takes a few seconds
+
+head( dens )
+```
+
+Plot histogram of true lambda and density
+
+```{r}
+hist( log10(ex_data$true_lambda), 50, freq=FALSE )
+
+lines( dens, col="red" )
+```
