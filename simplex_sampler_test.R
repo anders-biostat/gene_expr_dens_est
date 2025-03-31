@@ -12,13 +12,14 @@ Rcpp::sourceCpp("simplex_sampler_threaded.cc", verbose=TRUE, rebuild=TRUE );
 n <- 1500
 s <- round( 10^rnorm( n, log10(2500), .5 ) )
 truelambda <- 10^ifelse( runif(n)<.7, rnorm( n, -3.3, .4 ), rnorm( n, -1.7, .2 ) )
+#truelambda <- rep( 1e-2, n )
 k <- rpois( n, truelambda*s )
 
 ## Construct density basis
-stepsize <- log(1.125)  # log(nu)
+stepsize <- log(1.2)  # log(nu)
 mu <- exp( seq( log(3e-5), 0, by=stepsize ) )
 #mu <- sample(mu)
-shape <- 2 / stepsize  # kappa
+shape <- 10 / stepsize  # kappa
 scale <- mu / shape    # theta
 
 ## Pre-calculate NB probs
@@ -28,10 +29,11 @@ pmf_nb <- sapply( mu, function(mu_) dnbinom( k, mu=s*mu_, size=shape ) )
 draws <- sample_mixture_weights_threads( pmf_nb, n_burnin_draws=0L, n_keep_draws=10000L, 
                temperature_decrease=.95, global_seed = as.integer( runif(1,0,100000) ),  )
 
-plot(draws[[1]][,11], type="l", ylim=c(0,.02))
-lines(draws[[2]][,11], col=2)
-lines(draws[[3]][,11], col=3)
-lines(draws[[4]][,11], col=4)
+
+plot(draws[[1]][,15], type="l", ylim=c(0,.04), xlab="simulated annealing time", ylab="coef #15")
+lines(draws[[2]][,15], col=2)
+lines(draws[[3]][,15], col=3)
+lines(draws[[4]][,15], col=4)
 
 # Get means
 #spi <- sapply( draws, colMeans )
@@ -39,7 +41,7 @@ spi <- sapply( draws, function(x) x[ nrow(x), ] )
 max( dist(t(spi)) )
 
 # Plot result
-hist( log10(truelambda), freq=FALSE, xlab="log10(lambda)", 30, main="", xlim=c(-6,1) )
+hist( log10(truelambda), freq=FALSE, xlab="log10(lambda)", 30, main="", xlim=c(-6,1), ylim=c(0,.8) )
 xg <- seq( -6, 0, length.out=1000 )      
 for( i in 1:ncol(spi) )
    lines( xg,
