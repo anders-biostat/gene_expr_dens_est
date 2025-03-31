@@ -7,19 +7,15 @@ k <- rpois( n, truelambda*s )
 hist( log10(truelambda), freq=FALSE, xlab="log10(lambda)", 30, main="", xlim=c(-6,1) )
 
 ## Compile C++ cpde
-eigen_flags <- system("pkg-config --cflags eigen3", intern = TRUE)
-custom_inc  <- normalizePath("libcmaes/include")
-Sys.setenv(PKG_CXXFLAGS = paste(eigen_flags, "-I", custom_inc, "-lcmaes"))
-lib_path <- normalizePath("libcmaes/lib")
-Sys.setenv(PKG_LIBS = paste("-L", lib_path, "-lcmaes", "-Wl,-rpath", lib_path))
-
+Sys.setenv(PKG_CXXFLAGS = system("pkg-config --cflags libcmaes", intern=TRUE) )
+Sys.setenv(PKG_LIBS = system("pkg-config --libs libcmaes", intern=TRUE) )
 Rcpp::sourceCpp("test_cmaes.cc", verbose=TRUE, rebuild=TRUE)
 test() 
 
 
 ## Estimator hyperparameters
-min_mu <- 3e-5
-stepsize <- 1.13
+min_mu <- 1e-5
+stepsize <- 1.4
 overlap_factor <- 1
 
 ## Construct density basis
@@ -44,5 +40,5 @@ dens_est$density <- (
    %*% spi )
 
 xg <- seq( -6, 0, length.out=1000 )      
-lines( dens_est, col="red" )
+lines( dens_est, col="blue" )
 
