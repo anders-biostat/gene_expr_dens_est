@@ -292,8 +292,8 @@ cmaes_init_final(cmaes_t *t /* "this" */)
 
   if (!t->sp.flgsupplemented) {
     cmaes_readpara_SupplementDefaults(&t->sp);
-    //if (!isNoneStr(t->sp.filename)) /* TODO: should this be done in readpara_SupplementDefaults? */
-    //  cmaes_readpara_WriteToFile(&t->sp, "actparcmaes.par");
+    if (!isNoneStr(t->sp.filename)) /* TODO: should this be done in readpara_SupplementDefaults? */
+      cmaes_readpara_WriteToFile(&t->sp, "actparcmaes.par");
   }
      
   t->sp.seed = cmaes_random_init( &t->rand, (long unsigned int) t->sp.seed);
@@ -3097,7 +3097,7 @@ static void ERRORMESSAGE( char const *s1, char const *s2,
   /*  static char szBuf[700];  desirable but needs additional input argument 
       sprintf(szBuf, "%f:%f", gen, gen*lambda);
   */
-  FILE *fp = NULL; //fopen( "errcmaes.err", "a");
+  FILE *fp = fopen( "errcmaes.err", "a");
   if (fp == NULL) {
     printf("\nFATAL ERROR: ");
     printErrorStrings(stdout, s1, s2, s3, s4);
