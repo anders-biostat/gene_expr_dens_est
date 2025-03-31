@@ -1,5 +1,4 @@
-#define MCMC_ENABLE_ARMA_WRAPPERS
-#include "mcmc.hpp"
+#include <armadillo.h>
 #include <Rcpp.h>
 
 void transform_to_simplex( const arma::vec& vals, arma::vec& simplex_point )
