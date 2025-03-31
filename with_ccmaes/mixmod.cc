@@ -1,54 +1,50 @@
 #include <Rcpp.h>
-#include <armadillo>
 #include "c-cmaes/src/cmaes_interface.h"
 
 #include "c-cmaes/src/cmaes.c"
 
-// [[Rcpp::depends(RcppArmadillo)]]
-
-void transform_to_simplex(const arma::vec& vals, arma::vec& simplex_point) {
-   const int len = vals.n_elem;
+void transform_to_simplex( const double *const vals, double *const simplex_point, int n ) {
    double cumprod = 1.0;
-   for (int i = 0; i < len; i++) {
+   for (int i = 0; i < n; i++) {
       simplex_point[i] = cumprod * (1.0 - vals[i]);
       cumprod *= vals[i];
    }
-   simplex_point[len] = cumprod;
+   simplex_point[n] = cumprod;
 }
 
-double log_target_dens(const arma::vec& vals_inp, const Rcpp::NumericMatrix& lhm) {
-   const int len = vals_inp.n_elem;
+double log_target_dens( const double *const vals_inp, const Rcpp::NumericMatrix& lhm ) {
+   const int n = lhm.ncol() - 1;
    double ltd = 0.0;
    
    // Logistic transform
-   arma::vec vals = 1.0 / (1.0 + arma::exp(-vals_inp));
+   double vals[n];
+   for( int i = 0; i<n; i++ )
+      vals[i] = 1.0 / ( 1.0 + std::exp(-vals_inp[i]) );
    
    // Jacobian term
-   for (int j = 0; j < len - 1; j++) {
+   for (int j = 0; j < n - 1; j++) {
       ltd += std::log(vals[j] * (1.0 - vals[j]));
    }
    
    // Prior on simplex
-   for (int j = 0; j < len - 1; j++) {
-      ltd += (len - j - 1) * std::log(vals[j]);
+   for (int j = 0; j < n - 1; j++) {
+      ltd += (n - j - 1) * std::log(vals[j]);
    }
    
    // Map to simplex
-   arma::vec simplex_point(len + 1);
-   transform_to_simplex(vals, simplex_point);
+   double simplex_point[ n+1 ];
+   transform_to_simplex(vals, simplex_point, n);
    
    // Log-likelihood
    for (int i = 0; i < lhm.nrow(); i++) {
       double lh = 0.0;
-      for (int j = 0; j < len + 1; j++)
+      for (int j = 0; j < n + 1; j++)
          lh += lhm(i,j) * simplex_point[j];
       ltd += std::log(lh);
-   }
+   } 
    
    return ltd;
-}
-
-
+} 
 
 // [[Rcpp::export]]
 Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
@@ -61,6 +57,9 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
    int iter = 0;
    cmaes_t evo;
    
+   if( n <= 1 )
+      Rcpp::stop( "matrix must have at least 2 columns" );
+   
    std::fill_n( x0, n, 0. );
    std::fill_n( sigma0, n, 1. );
    funvals = cmaes_init( &evo, n, x0, sigma0, 0, 0, NULL );
@@ -70,8 +69,7 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
       pop = cmaes_SamplePopulation(&evo);
       
       for( int i = 0; i < evo.sp.lambda; ++i ) {
-         arma::vec v( pop[i], n, false, true );
-         funvals[i] = -log_target_dens( v, lhm );
+         funvals[i] = -log_target_dens( pop[i], lhm );
          Rcpp::Rcout << funvals[i] << std::endl;
       }
       cmaes_UpdateDistribution( &evo, funvals );  
@@ -80,17 +78,13 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
       Rcpp::checkUserInterrupt();
    }
       
-   arma::vec v; v.set_size(n);
+   double v[n];
    for( int i=0; i<n; i++ ) {
       v[i] = 1. / ( 1. + std::exp(-evo.rgxmean[i]) );
    }
    Rcpp::NumericVector ans(n+1);
-   arma::vec w( ans.begin(), n+1, false, true);
-   transform_to_simplex( v, w );
-   for( int i=0; i<n; i++ )
-      Rcpp::Rcout << w[i] << " ";
-   Rcpp::Rcout << std::endl;
-   
+   transform_to_simplex( v, ans.begin(), n );
+
    ans.attr("stopping_reason") = cmaes_TestForTermination(&evo);
    ans.attr("population_size") = evo.sp.lambda;
    ans.attr("iterations") = iter;
