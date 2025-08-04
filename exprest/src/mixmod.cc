@@ -45,7 +45,7 @@ double log_target_dens( const double *const vals_inp,
       ltd += std::log(lh);
    } 
    
-   // neighbor-diff penalty
+   // curvature penalty
    for (int i = 1; i < n; i++) {
       double ddiff = simplex_point[i+1] - 2*simplex_point[i] + simplex_point[i-1];
       ltd -= penalty_coef*nrow * ddiff*ddiff;
@@ -67,7 +67,6 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm, const double penalty_coef=0
    if( n <= 1 )
       Rcpp::stop( "matrix must have at least 2 columns" );
    
-   Rcpp::Rcout << "FOO" << std::endl;
    std::fill_n( x0, n, 0. );
    std::fill_n( sigma0, n, 1. );
    funvals = cmaes_init( &evo, n, x0, sigma0, 0, 0, NULL );
