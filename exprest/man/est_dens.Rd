@@ -4,19 +4,19 @@
 Estimate Density underlying Poisson-widened count observations
 }
 \description{
-In RNA-Seq analysis, one often uses the following model: The expression strength $\lambda$
+In RNA-Seq analysis, one often uses the following model: The expression strength \eqn{\lambda}{lambda}
 of a gene of interest in each cell (or sample, in case of bulk data) is drawn
 from an unknown distribution, which specifies the fraction of the cell's total
-mRNA complement that orginates from this gene. The observed read or UMI count $k$
-are then modeled as drawn from a Poisson distribution with expectation $s\lambda$,
-where $s$ is the total number of reads (summed over all genes) for the cell.
+mRNA complement that orginates from this gene. The observed read or UMI count \eqn{k}{k}
+are then modeled as drawn from a Poisson distribution with expectation \eqn{\lambda}{lambda},
+where \eqn{s}{s} is the total number of reads (summed over all genes) for the cell.
 
-This function estimates the distribution of the expression strengths $\lambda$
+This function estimates the distribution of the expression strengths \eqn{\lambda}{lambda}
 by performing maximum likelihood estimation over a space of trial functions
 which are linear combinations of Gamma distribution densities with increasing means.
 }
 \usage{
-est_dens(k, s, min_mu = 3e-05, step_factor = 1.2, shape_factor = 10)
+est_dens(k, s, min_mu = 3e-05, step_factor = 1.2, shape_factor = 10, pty=.3)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -27,14 +27,17 @@ est_dens(k, s, min_mu = 3e-05, step_factor = 1.2, shape_factor = 10)
   \item{step_factor}{The factor by which the mean increases from one Gamma basis 
   distribution to the next. Bigger values result in coarser estimates.}
   \item{shape_factor}{The shape parameter of the basis Gamma distributions
-  is log(step_factor) divided by this argument.}
+  is log(step_factor) divided by this argument. A too large shape factor results in
+  a "comb-like" estimate, a too small factor in too wide peaks.}
+  \item{pty}{The curvature penality. A small poenality makes the estimated density
+  more "wiggly", a large one more "stiff".}
 }
 \details{
 %%  ~~ If necessary, more details than the description above ~~
 }
 \value{
 a data frame with two columns: 
-\item{log10lamba}{A sequence of log10 lambda values, suitable as x values for 
+\item{log10lambda}{A sequence of log10 lambda values, suitable as x values for 
 plotting the density on a log scale}
 \item{density}{the estimated probability density for the logarithmic expression 
 strength distribution, suitable as y values for plotting the density}

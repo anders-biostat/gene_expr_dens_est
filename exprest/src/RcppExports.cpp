@@ -11,19 +11,20 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // mixmod
-Rcpp::NumericVector mixmod(Rcpp::NumericMatrix lhm);
-RcppExport SEXP _exprest_mixmod(SEXP lhmSEXP) {
+Rcpp::NumericVector mixmod(Rcpp::NumericMatrix lhm, const double penalty_coef);
+RcppExport SEXP _exprest_mixmod(SEXP lhmSEXP, SEXP penalty_coefSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type lhm(lhmSEXP);
-    rcpp_result_gen = Rcpp::wrap(mixmod(lhm));
+    Rcpp::traits::input_parameter< const double >::type penalty_coef(penalty_coefSEXP);
+    rcpp_result_gen = Rcpp::wrap(mixmod(lhm, penalty_coef));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_exprest_mixmod", (DL_FUNC) &_exprest_mixmod, 1},
+    {"_exprest_mixmod", (DL_FUNC) &_exprest_mixmod, 2},
     {NULL, NULL, 0}
 };
 

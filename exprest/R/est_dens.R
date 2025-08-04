@@ -1,4 +1,4 @@
-est_dens <- function( k, s, min_mu=3e-5, step_factor=1.2, shape_factor=10 ) {
+est_dens <- function( k, s, min_mu=3e-5, step_factor=1.2, shape_factor=10, pty=.3 ) {
 
 	stepsize <- log(step_factor)
 	mu <- exp( seq( log(min_mu), 0, by=stepsize ) )
@@ -6,7 +6,7 @@ est_dens <- function( k, s, min_mu=3e-5, step_factor=1.2, shape_factor=10 ) {
 	scale <- mu / shape    # theta
 	lh_nb <- sapply( mu, function(mu_) dnbinom( k, mu=s*mu_, size=shape ) )
 
-	weights <- mixmod(lh_nb)
+	weights <- mixmod( lh_nb, pty )
 
 	dens_est <- data.frame(
 	  log10lambda = seq( log10(min_mu)-1, 0, length.out=1000 ) )

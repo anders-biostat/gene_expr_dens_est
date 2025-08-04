@@ -12,8 +12,10 @@ void transform_to_simplex( const double *const vals, double *const simplex_point
    simplex_point[n] = cumprod;
 }
 
-double log_target_dens( const double *const vals_inp, const Rcpp::NumericMatrix& lhm ) {
+double log_target_dens( const double *const vals_inp, 
+      const Rcpp::NumericMatrix& lhm, const double penalty_coef=0. ) {
    const int n = lhm.ncol() - 1;
+   const int nrow = lhm.nrow();
    double ltd = 0.0;
    
    // Logistic transform
@@ -36,18 +38,23 @@ double log_target_dens( const double *const vals_inp, const Rcpp::NumericMatrix&
    transform_to_simplex(vals, simplex_point, n);
    
    // Log-likelihood
-   for (int i = 0; i < lhm.nrow(); i++) {
+   for (int i = 0; i < nrow; i++) {
       double lh = 0.0;
       for (int j = 0; j < n + 1; j++)
          lh += lhm(i,j) * simplex_point[j];
       ltd += std::log(lh);
    } 
    
+   // neighbor-diff penalty
+   for (int i = 1; i < n; i++) {
+      double ddiff = simplex_point[i+1] - 2*simplex_point[i] + simplex_point[i-1];
+      ltd -= penalty_coef*nrow * ddiff*ddiff;
+   } 
    return ltd;
 } 
 
 // [[Rcpp::export]]
-Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
+Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm, const double penalty_coef=0. ) {
    
    int n = lhm.ncol() - 1;
    double x0[n];
@@ -60,6 +67,7 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
    if( n <= 1 )
       Rcpp::stop( "matrix must have at least 2 columns" );
    
+   Rcpp::Rcout << "FOO" << std::endl;
    std::fill_n( x0, n, 0. );
    std::fill_n( sigma0, n, 1. );
    funvals = cmaes_init( &evo, n, x0, sigma0, 0, 0, NULL );
@@ -70,7 +78,7 @@ Rcpp::NumericVector mixmod( Rcpp::NumericMatrix lhm ) {
       pop = cmaes_SamplePopulation(&evo);
       
       for( int i = 0; i < evo.sp.lambda; ++i ) {
-         funvals[i] = -log_target_dens( pop[i], lhm );
+         funvals[i] = -log_target_dens( pop[i], lhm, penalty_coef );
       }
       cmaes_UpdateDistribution( &evo, funvals );  
       iter++;
