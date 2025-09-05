@@ -28,7 +28,7 @@ DimPlot(seu, reduction="Xumap_", group.by = "free_annotation", label=FALSE) +
 Here with colour guide:
 
 ```{r}
-DimPlot(seu, reduction="Xumap_", group.by = "cell_type") + coord_equal() 
+DimPlot(seu, reduction="Xumap_", group.by = "free_annotation") + coord_equal() 
 ```
 
 We pick one gene, LCP1.

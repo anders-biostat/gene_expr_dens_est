@@ -134,5 +134,8 @@ Here, the red line is the density estimate. It is plotted over a histogram of th
 
 ### Application to real data
 
+```{r}
+seu <- schard::h5ad2seurat('~/Blood_TSP1_30_version2d_10X_smartseq_scvi_Nov122024.h5ad')
+```
 
 
