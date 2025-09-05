@@ -1,0 +1,51 @@
+---
+title: "Exprest vignette / Seurat example"
+format: html
+---
+
+To demonstrate *exprest* with real data, we use the Blood dataset from the Tabula Sapiens (Tabula Sapiens Consortium, [Science, 2022](https://doi.org/10.1126/science.abl4896)). This data set is available as AnnData file (h5ad format) from the [FigShare data page](https://figshare.com/articles/dataset/Tabula_Sapiens_v2/27921984).
+
+```{r message=FALSE}
+library(tidyverse)
+library(Seurat)
+```
+
+We load the AnnData object in the h5ad file using the [schard](https://github.com/cellgeni/schard) package, which converts it to a Seurat object while loading.
+
+```{r}
+seu <- schard::h5ad2seurat("~/Blood_TSP1_30_version2d_10X_smartseq_scvi_Nov122024.h5ad")
+```
+
+The data set contains data for 85k cells.
+
+Here is the UMAP plot with the cell-type annotations as provided in the object:
+
+```{r}
+DimPlot(seu, reduction="Xumap_", group.by = "free_annotation", label=FALSE) + 
+  coord_equal() + guides(color = "none")
+```
+
+Here with colour guide:
+
+```{r}
+DimPlot(seu, reduction="Xumap_", group.by = "cell_type") + coord_equal() 
+```
+
+We pick one gene, LCP1.
+
+```{r}
+gene_id <- "LCP1"
+
+seu@assays$RNA@meta.features[gene_id,]
+```
+
+LCP is a good example as it has expression in several of the cell types but at different level:
+
+```{r}
+FeaturePlot(seu, gene_id, reduction="Xumap_") + coord_equal()
+```
+
+```{r warning=FALSE,fig.width=7,fig.height=6.5}
+VlnPlot(seu, gene_id, alpha=.07, group.by="free_annotation") + guides(fill = "none")
+```
+
